@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simple To-Do List</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; background: #f4f6f8; color: #1f2933; }
+    main { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px #00000014; }
+    h1 { margin-top: 0; }
+    form { display: flex; gap: 8px; }
+    input { flex: 1; padding: 10px; border: 1px solid #b8c2cc; border-radius: 4px; font-size: 16px; }
+    button { padding: 10px 14px; border: 0; border-radius: 4px; cursor: pointer; background: #1769aa; color: white; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
+    li span { flex: 1; }
+    li.done span { text-decoration: line-through; color: #7b8794; }
+    li button { background: #c0392b; padding: 6px 10px; }
+    #empty { color: #7b8794; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>My To-Do List</h1>
+    <form id="task-form">
+      <input id="task-input" type="text" placeholder="Add a task" required>
+      <button type="submit">Add</button>
+    </form>
+    <p id="empty">No tasks yet.</p>
+    <ul id="task-list"></ul>
+  </main>
+
+  <script>
+    const form = document.querySelector('#task-form');
+    const input = document.querySelector('#task-input');
+    const list = document.querySelector('#task-list');
+    const empty = document.querySelector('#empty');
+
+    async function loadTasks() {
+      const response = await fetch('/api/tasks');
+      render(await response.json());
+    }
+
+    function render(tasks) {
+      list.innerHTML = '';
+      empty.hidden = tasks.length > 0;
+      tasks.forEach(task => {
+        const item = document.createElement('li');
+        if (task.done) item.classList.add('done');
+        item.innerHTML = `
+          <input type="checkbox" ${task.done ? 'checked' : ''} aria-label="Complete task">
+          <span>${escapeHtml(task.text)}</span>
+          <button type="button">Delete</button>`;
+        item.querySelector('input').addEventListener('change', event => updateTask(task.id, event.target.checked));
+        item.querySelector('button').addEventListener('click', () => deleteTask(task.id));
+        list.appendChild(item);
+      });
+    }
+
+    async function updateTask(id, done) {
+      await fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }) });
+      loadTasks();
+    }
+
+    async function deleteTask(id) {
+      await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      loadTasks();
+    }
+
+    function escapeHtml(text) {
+      return text.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      await fetch('/api/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: input.value }) });
+      input.value = '';
+      loadTasks();
+    });
+
+    loadTasks();
+  </script>
+</body>
+</html>
